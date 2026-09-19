@@ -1,0 +1,50 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, condor-private]
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: npm install
+      - run: npm test
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::337058058699:role/condor-pagos-deploy
+          aws-region: us-east-1
+
+      - name: Build and push image
+        run: |
+          REPO=337058058699.dkr.ecr.us-east-1.amazonaws.com/condor-pagos
+          IMAGE="$REPO:${{ github.sha }}"
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 337058058699.dkr.ecr.us-east-1.amazonaws.com
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          DIGEST=$(aws ecr describe-images --repository-name condor-pagos --image-ids imageTag=${{ github.sha }} --query 'imageDetails[0].imageDigest' --output text)
+          echo "IMAGE_DIGEST=$DIGEST" >> "$GITHUB_ENV"
+
+      - name: Resolve database connection
+        run: |
+          DB_ENDPOINT=$(aws rds describe-db-clusters --db-cluster-identifier condor-pagos-db --query 'DBClusters[0].Endpoint' --output text)
+          SECRET_ARN=$(aws rds describe-db-clusters --db-cluster-identifier condor-pagos-db --query 'DBClusters[0].MasterUserSecret.SecretArn' --output text)
+          DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text | python3 -c 'import json,sys; print(json.load(sys.stdin)["password"])')
+          echo "::add-mask::$DB_PASSWORD"
+          echo "DATABASE_URL=mysql://pagos:${DB_PASSWORD}@${DB_ENDPOINT}/pagos" >> "$GITHUB_ENV"
+
+      - name: Deploy
+        run: |
+          aws eks update-kubeconfig --name condor-pagos --region us-east-1
+          kubectl get namespace pagos || kubectl create namespace pagos
+          helm upgrade --install pagos chart/ -n pagos \
+            --set image.repository=337058058699.dkr.ecr.us-east-1.amazonaws.com/condor-pagos \
+            --set image.digest="$IMAGE_DIGEST" \
+            --set env.DATABASE_URL="$DATABASE_URL"

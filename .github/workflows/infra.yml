@@ -1,0 +1,23 @@
+name: infra
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan:
+    runs-on: [self-hosted, condor-private]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::337058058699:role/condor-pagos-tf-ci
+          aws-region: us-east-1
+
+      # Placeholder (task P1-07): the legitimate path Terraform changes to
+      # this stack would take, contrasted with P1-13's laptop apply.
+      - run: echo "infra.yml placeholder - no changes wired up yet"

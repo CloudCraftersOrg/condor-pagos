@@ -10,9 +10,10 @@ pipeline {
     stages {
         stage('Test') {
             steps {
+                // AL2's glibc (2.26) can't run Node >=24 natively (nodesource
+                // requires glibc >=2.28) - run inside node:24-alpine instead.
                 sh '''
-                    npm install
-                    npm test
+                    docker run --rm -v "$WORKSPACE":/app -w /app node:24-alpine sh -c "npm install && npm test"
                 '''
             }
         }

@@ -2,8 +2,8 @@ const express = require("express");
 const mysql = require("mysql2/promise");
 const fs = require("fs");
 
-// Harness-induced deploy failure (P1-14), removed by the harness's own fix commit.
-if (fs.existsSync("FAIL_DEPLOY")) {
+// require.main guard: only the container's own entrypoint should trip this, not `npm test`'s require().
+if (require.main === module && fs.existsSync("FAIL_DEPLOY")) {
   console.error("FAIL_DEPLOY marker present");
   process.exit(1);
 }

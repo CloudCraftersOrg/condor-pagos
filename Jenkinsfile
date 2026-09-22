@@ -33,8 +33,12 @@ pipeline {
                         script: "aws rds describe-db-clusters --db-cluster-identifier condor-pagos-db --query 'DBClusters[0].MasterUserSecret.SecretArn' --output text",
                         returnStdout: true
                     ).trim()
+                    // RDS-managed passwords can contain URL-reserved characters
+                    // (# broke node's URL parser outright - confirmed live) -
+                    // percent-encode here rather than call a Java API from the
+                    // Groovy sandbox, mysql2 decodes it back on connect.
                     def dbPassword = sh(
-                        script: "aws secretsmanager get-secret-value --secret-id '${secretArn}' --query SecretString --output text | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"password\"])'",
+                        script: "aws secretsmanager get-secret-value --secret-id '${secretArn}' --query SecretString --output text | python3 -c 'import json,sys,urllib.parse; print(urllib.parse.quote(json.load(sys.stdin)[\"password\"], safe=\"\"))'",
                         returnStdout: true
                     ).trim()
                     env.DATABASE_URL = "mysql://pagos:${dbPassword}@${dbEndpoint}/pagos"

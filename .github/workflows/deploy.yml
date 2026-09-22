@@ -36,7 +36,7 @@ jobs:
         run: |
           DB_ENDPOINT=$(aws rds describe-db-clusters --db-cluster-identifier condor-pagos-db --query 'DBClusters[0].Endpoint' --output text)
           SECRET_ARN=$(aws rds describe-db-clusters --db-cluster-identifier condor-pagos-db --query 'DBClusters[0].MasterUserSecret.SecretArn' --output text)
-          DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text | python3 -c 'import json,sys; print(json.load(sys.stdin)["password"])')
+          DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text | python3 -c 'import json,sys,urllib.parse; print(urllib.parse.quote(json.load(sys.stdin)["password"], safe=""))')
           echo "::add-mask::$DB_PASSWORD"
           echo "DATABASE_URL=mysql://pagos:${DB_PASSWORD}@${DB_ENDPOINT}/pagos" >> "$GITHUB_ENV"
 

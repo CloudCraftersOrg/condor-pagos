@@ -1,5 +1,12 @@
 const express = require("express");
 const mysql = require("mysql2/promise");
+const fs = require("fs");
+
+// Harness-induced deploy failure (P1-14), removed by the harness's own fix commit.
+if (fs.existsSync("FAIL_DEPLOY")) {
+  console.error("FAIL_DEPLOY marker present");
+  process.exit(1);
+}
 
 const app = express();
 app.use(express.json());
